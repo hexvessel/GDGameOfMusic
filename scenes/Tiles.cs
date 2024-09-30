@@ -8,7 +8,8 @@ public partial class Tiles : Node2D
     TileMapLayer map;
     HSlider slider;
     Timer timer;
-    AudioStreamPlayer audio;
+    int xStep = 10;
+    int yStep = 10;
     Vector2I TileId = new Vector2I(0, 0);
     Vector2I size = new Vector2I(73, 41);
     List<Vector2I> live = new List<Vector2I> { };
@@ -32,8 +33,7 @@ public partial class Tiles : Node2D
         map = GetNode<TileMapLayer>("TileMapLayer");
         slider = GetNode<HSlider>("HSlider");
         timer = GetNode<Timer>("Timer");
-        audio = GetNode<AudioStreamPlayer>("AudioStreamPlayer");
-        audioMap = GenerateNoteNodes(5, 5);
+        audioMap = GenerateNoteNodes(xStep, yStep);
     }
     public override void _Process(double delta)
     {
@@ -48,6 +48,14 @@ public partial class Tiles : Node2D
     }
     public void Step()
     {
+        for (int i = 0; i < GetChildCount(); i++)
+        {
+            if (GetChild(i) is AudioStreamPlayer audioStreamPlayer)
+            {
+                audioStreamPlayer.Stop();
+                audioStreamPlayer.QueueFree();
+            }
+        }
         live.Clear();
         for (int i = 0; i < size.X; i++)
         {
@@ -63,7 +71,10 @@ public partial class Tiles : Node2D
                         int indexOfAudioFile = audioMap.IndexOf(new Vector2I(i, j));
                         if (indexOfAudioFile >= 0)
                         {
+                            AudioStreamPlayer audio = new AudioStreamPlayer();
                             audio.Stream = ResourceLoader.Load<AudioStream>(audioPaths[indexOfAudioFile % 11]);
+                            audio.Finished += audio.QueueFree;
+                            AddChild(audio);
                             audio.Play();
                         }
                     }
@@ -110,7 +121,33 @@ public partial class Tiles : Node2D
         {
             timer.Start();
         }
-        timer.WaitTime = Value;
+        timer.WaitTime = Value > 0 ? Value : 0.1;
+    }
+
+    public void XScrollValueChanged(float value)
+    {
+        xStep = (int)value;
+        timer.Stop();
+        slider.Value = 0;
+        audioMap = GenerateNoteNodes(xStep, yStep);
+        map.Clear();
+        for (int i = 0; i < audioMap.Count; i++)
+        {
+            map.SetCell(audioMap[i], 0, new Vector2I(1, 0));
+        }
+    }
+
+    public void YScrollValueChanged(float value)
+    {
+        yStep = (int)value;
+        timer.Stop();
+        slider.Value = 0;
+        audioMap = GenerateNoteNodes(xStep, yStep);
+        map.Clear();
+        for (int i = 0; i < audioMap.Count; i++)
+        {
+            map.SetCell(audioMap[i], 0, new Vector2I(1, 0));
+        }
     }
     public void ButtonPressed()
     {
@@ -119,13 +156,14 @@ public partial class Tiles : Node2D
     public void ShufflePressed()
     {
         audioPaths = Shuffle(audioPaths);
+        audioMap = GenerateNoteNodes(xStep, yStep);
     }
     public List<Vector2I> GenerateNoteNodes(int xStep, int yStep)
     {
         List<Vector2I> list = new List<Vector2I>();
-        for (int i = xStep; i < size.X; i += xStep)
+        for (int i = 0; i < size.X; i += xStep)
         {
-            for (int j = yStep; j < size.Y; j += yStep)
+            for (int j = 0; j < size.Y; j += yStep)
             {
                 list.Add(new Vector2I(i, j));
             }
